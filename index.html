@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Oven Dashboard – SMKN 4 Dumai</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<style>
+.card{box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.matrix{display:grid;grid-template-columns:repeat(8,18px);gap:4px}
+.cell{width:18px;height:18px;background:#000;border-radius:2px}
+
+/* STATUS */
+.status{
+  font-size:28px;
+  font-weight:800;
+  text-align:center;
+  padding:18px;
+  border-radius:14px;
+  transition:.4s;
+}
+
+/* BACKGROUND FOTO */
+body{
+  background:
+    linear-gradient(rgba(243,244,246,.75), rgba(243,244,246,.75)),
+    url("./iot2.jpg") center/cover no-repeat fixed !important;
+}
+
+
+.idle{background:#e5e7eb;color:#374151}
+.heating{background:linear-gradient(90deg,#dc2626,#f97316);color:white}
+.normal{background:linear-gradient(90deg,#16a34a,#22c55e);color:white}
+.warning{
+  background:linear-gradient(90deg,#dc2626,#fde047);
+  color:black;animation:pulse 1s infinite
+}
+.shutdown{
+  background:black;color:red;animation:blink .6s infinite
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.04)}}
+
+/* LOG */
+.log-box{max-height:220px;overflow:auto;font-size:13px}
+.log-item{border-bottom:1px solid #eee;padding:4px 0}
+</style>
+</head>
+
+<body>
+<div class="max-w-6xl mx-auto p-6">
+
+<div class="flex items-center gap-3 mb-4">
+  <img src="logo-SMKN4.png" alt="Logo SMKN 4 Dumai" class="h-12">
+  <h1 class="text-2xl font-bold">
+    Oven Control Dashboard Realtime – SMKN 4 Dumai
+  </h1>
+</div>
+
+<div class="grid grid-cols-3 gap-4">
+
+<!-- ================= CONTROL ================= -->
+<div class="bg-white p-4 rounded card">
+  <h2 class="font-semibold mb-3">Control Panel</h2>
+
+  <button id="btn-start"
+    class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded mb-2">
+    ▶ Start Heating
+  </button>
+
+  <button id="btn-stop"
+    class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded mb-2">
+    ⛔ Stop
+  </button>
+
+  <button id="btn-reset"
+    class="w-full bg-blue-600 text-white py-2 rounded mb-4 opacity-50 cursor-not-allowed"
+    disabled>
+    🔄 Reset (after shutdown)
+  </button>
+
+  <button id="btn-export"
+    class="w-full bg-gray-700 hover:bg-gray-800 text-white py-2 rounded">
+    ⬇ Export CSV
+  </button>
+
+  <div class="mt-4 text-sm">
+    Connection:
+    <span id="conn" class="font-bold text-red-600">Disconnected</span>
+  </div>
+</div>
+
+<!-- ================= STATUS + PREVIEW ================= -->
+<div class="bg-white p-4 rounded card">
+  <h2 class="font-semibold mb-2">Live Status</h2>
+
+  <div class="flex justify-between mb-4">
+    <div>
+      <div class="text-sm text-gray-500">Temperature</div>
+      <div id="temp" class="text-3xl font-bold">-- °C</div>
+    </div>
+    <div>
+      <div class="text-sm text-gray-500">Heating</div>
+      <div id="heat" class="text-xl font-bold">--</div>
+    </div>
+  </div>
+
+  <div class="matrix mb-4" id="matrix"></div>
+  <div id="statusBox" class="status idle">IDLE</div>
+</div>
+
+<!-- ================= GRAPH ================= -->
+<div class="bg-white p-4 rounded card">
+  <h2 class="font-semibold mb-2">Temperature Graph</h2>
+  <canvas id="chart" height="200"></canvas>
+</div>
+
+</div>
+
+<!-- ================= LOG ================= -->
+<div class="bg-white p-4 rounded card mt-6">
+  <div class="flex justify-between mb-2">
+    <h2 class="font-semibold">Event Log</h2>
+    <span class="text-xs text-gray-500">latest first</span>
+  </div>
+  <div id="log" class="log-box"></div>
+</div>
+
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const WS_HOST = "192.168.0.105";
+const wsUrl = `wss://detect-devices-brown-acres.trycloudflare.com`;
+
+let ws, chart, tempData=[];
+let logData=[];
+
+/* ================= MATRIX ================= */
+const matrix=document.getElementById("matrix");
+for(let i=0;i<64;i++){
+  const d=document.createElement("div");
+  d.className="cell";
+  matrix.appendChild(d);
+}
+
+/* ================= CHART ================= */
+chart=new Chart(document.getElementById("chart"),{
+  type:"line",
+  data:{labels:[],datasets:[{data:[],borderColor:"red",tension:.3}]},
+  options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false}}}
+});
+
+/* ================= STATUS ================= */
+function setStatus(mode){
+  const sb=document.getElementById("statusBox");
+  sb.className="status";
+
+  if(mode==="IDLE"){sb.textContent="IDLE";sb.classList.add("idle")}
+  else if(mode==="HEATING"){sb.textContent="HEATING";sb.classList.add("heating")}
+  else if(mode==="NORMAL"){sb.textContent="NORMAL HEATING";sb.classList.add("normal")}
+  else if(mode==="WARNING"){sb.textContent="OVERHEAT WARNING";sb.classList.add("warning")}
+  else if(mode==="SHUTDOWN"){sb.textContent="AUTO SHUTDOWN";sb.classList.add("shutdown")}
+}
+
+/* ================= BLOOM PREVIEW ================= */
+function bloom(c1,c2){
+  const cx=3.5,cy=3.5;
+  [0.6,1.4,2.2,3,3.6].forEach((r,i)=>{
+    setTimeout(()=>{
+      for(let y=0;y<8;y++){
+        for(let x=0;x<8;x++){
+          const d=Math.max(Math.abs(x-cx),Math.abs(y-cy));
+          matrix.children[y*8+x].style.background =
+            d<=r ? (d<1?c1:c2) : "#000";
+        }
+      }
+    },i*90);
+  });
+}
+
+function preview(mode){
+  if(mode==="HEATING") bloom("#dc2626","#f97316");
+  else if(mode==="NORMAL") bloom("#16a34a","#22c55e");
+  else if(mode==="WARNING") bloom("#dc2626","#fde047");
+  else if(mode==="SHUTDOWN"){
+    matrix.childNodes.forEach(c=>c.style.background="#dc2626");
+  } else {
+    matrix.childNodes.forEach(c=>c.style.background="#9ca3af");
+  }
+}
+
+/* ================= RESET BUTTON ================= */
+const btnReset=document.getElementById("btn-reset");
+function updateReset(mode){
+  if(mode==="SHUTDOWN"){
+    btnReset.disabled=false;
+    btnReset.classList.remove("opacity-50","cursor-not-allowed");
+  } else {
+    btnReset.disabled=true;
+    btnReset.classList.add("opacity-50","cursor-not-allowed");
+  }
+}
+
+/* ================= LOG ================= */
+function addLog(t,temp,mode){
+  logData.unshift({t,temp,mode});
+  const div=document.createElement("div");
+  div.className="log-item";
+  div.textContent=`[${t}] ${temp}°C | ${mode}`;
+  document.getElementById("log").prepend(div);
+}
+
+/* ================= CSV ================= */
+document.getElementById("btn-export").onclick=()=>{
+  let csv="Time,Temperature,Mode\n";
+  logData.forEach(r=>csv+=`${r.t},${r.temp},${r.mode}\n`);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="oven_log.csv";
+  a.click();
+};
+
+/* ================= WS ================= */
+function connect(){
+  ws=new WebSocket(wsUrl);
+
+  ws.onopen=()=>document.getElementById("conn").textContent="Connected";
+  ws.onclose=()=>setTimeout(connect,2000);
+
+  ws.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    const time=new Date().toLocaleTimeString();
+
+    document.getElementById("temp").textContent=d.temperature+" °C";
+    document.getElementById("heat").textContent=d.heating_active?"ON":"OFF";
+
+    if(d.mode){
+      setStatus(d.mode);
+      preview(d.mode);
+      updateReset(d.mode);
+      addLog(time,d.temperature,d.mode);
+    }
+
+    tempData.push(d.temperature);
+    if(tempData.length>60)tempData.shift();
+    chart.data.labels=tempData.map((_,i)=>i);
+    chart.data.datasets[0].data=tempData;
+    chart.update();
+  };
+}
+
+/* ================= BUTTONS ================= */
+document.getElementById("btn-start").onclick=()=>{
+  ws.send(JSON.stringify({type:"control",action:"start_heating"}));
+};
+document.getElementById("btn-stop").onclick=()=>{
+  ws.send(JSON.stringify({type:"control",action:"stop_heating"}));
+};
+btnReset.onclick=()=>{
+  ws.send(JSON.stringify({type:"control",action:"reset"}));
+};
+
+connect();
+</script>
+</body>
+</html>

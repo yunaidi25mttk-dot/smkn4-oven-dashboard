@@ -11,14 +11,9 @@
 <style>
 .card{box-shadow:0 6px 18px rgba(0,0,0,.08)}
 .matrix{display:grid;grid-template-columns:repeat(8,18px);gap:4px;justify-content:center}
-.cell{width:18px;height:18px;background:#111;border-radius:2px}
-.status{font-size:26px;font-weight:800;text-align:center;padding:16px;border-radius:14px}
-.idle{background:#e5e7eb;color:#374151}
-.log-box{max-height:200px;overflow:auto;font-size:13px}
+.cell{width:18px;height:18px;background:#1f2937;border-radius:2px}
 body{
-  background:
-  linear-gradient(rgba(243,244,246,.85),rgba(243,244,246,.85)),
-  url("./iot2.jpg") center/cover fixed;
+  background:linear-gradient(rgba(243,244,246,.85),rgba(243,244,246,.85));
 }
 </style>
 </head>
@@ -26,31 +21,27 @@ body{
 <body>
 <div class="max-w-7xl mx-auto p-6">
 
-<!-- HEADER -->
-<div class="flex items-center gap-3 mb-4">
-  <img src="logo-SMKN4.png" class="h-12">
-  <h1 class="text-2xl font-bold">Oven Control Dashboard – SMKN 4 Dumai</h1>
-</div>
+<h1 class="text-2xl font-bold mb-6">
+  Oven Dashboard – SMKN 4 Dumai
+</h1>
 
-<!-- ================= DASHBOARD UTAMA ================= -->
+<!-- ================= MAIN ================= -->
 <div class="grid grid-cols-3 gap-4">
 
-<div class="bg-white p-4 rounded card">
-  <h2 class="font-semibold mb-3">Control Panel</h2>
-  <button class="w-full bg-green-600 text-white py-2 rounded mb-2">▶ Start</button>
-  <button class="w-full bg-yellow-500 text-white py-2 rounded mb-2">⛔ Stop</button>
-</div>
-
 <div class="bg-white p-4 rounded card text-center">
-  <h2 class="font-semibold mb-2">Live Status</h2>
-  <div id="main-temp" class="text-3xl font-bold mb-3">-- °C</div>
-  <div class="matrix mx-auto mb-3" id="matrix-main"></div>
-  <div class="status idle">IDLE</div>
+  <h2 class="font-semibold mb-2">Oven Utama</h2>
+  <div id="main-temp" class="text-3xl font-bold mb-2">-- °C</div>
+  <div id="matrix-main" class="matrix"></div>
 </div>
 
 <div class="bg-white p-4 rounded card">
-  <h2 class="font-semibold mb-2">Temperature Graph</h2>
+  <h2 class="font-semibold mb-2">Grafik Utama</h2>
   <canvas id="chart-main" height="180"></canvas>
+</div>
+
+<div class="bg-white p-4 rounded card">
+  <h2 class="font-semibold mb-2">Status</h2>
+  <div id="status" class="text-xl font-bold">MENUNGGU DATA</div>
 </div>
 
 </div>
@@ -58,40 +49,44 @@ body{
 <!-- ================= BAKING MODE ================= -->
 <div class="grid grid-cols-2 gap-6 mt-8">
 
-<!-- API ATAS -->
+<!-- TOP -->
 <div class="bg-white p-4 rounded card">
-  <h2 class="font-bold text-center mb-2">🔥 Api Atas – Max 160°C</h2>
+  <h2 class="font-bold text-center mb-2">🔥 Api Atas (160°C)</h2>
 
   <div class="flex justify-between text-sm mb-2">
-    <span>Timer: <b id="timer-top">15:00</b></span>
-    <button id="alarm-top" class="bg-gray-600 text-white px-3 rounded text-xs">
+    <span>Timer: <b id="timer-top">--:--</b></span>
+    <button id="alarm-top"
+      class="px-3 py-1 bg-gray-600 text-white rounded text-xs">
       🔔 Alarm OFF
     </button>
   </div>
 
-  <div class="matrix mb-3" id="matrix-top"></div>
+  <div id="matrix-top" class="matrix mb-3"></div>
   <canvas id="chart-top" height="160"></canvas>
 
-  <button id="add5-top" class="w-full bg-blue-500 text-white py-1 rounded mt-3">
+  <button id="add5-top"
+    class="w-full bg-blue-500 text-white py-1 rounded mt-2">
     ⏱ Tambah 5 Menit
   </button>
 </div>
 
-<!-- API BAWAH -->
+<!-- BOTTOM -->
 <div class="bg-white p-4 rounded card">
-  <h2 class="font-bold text-center mb-2">🔥 Api Bawah – Max 180°C</h2>
+  <h2 class="font-bold text-center mb-2">🔥 Api Bawah (180°C)</h2>
 
   <div class="flex justify-between text-sm mb-2">
-    <span>Timer: <b id="timer-bottom">15:00</b></span>
-    <button id="alarm-bottom" class="bg-gray-600 text-white px-3 rounded text-xs">
+    <span>Timer: <b id="timer-bottom">--:--</b></span>
+    <button id="alarm-bottom"
+      class="px-3 py-1 bg-gray-600 text-white rounded text-xs">
       🔔 Alarm OFF
     </button>
   </div>
 
-  <div class="matrix mb-3" id="matrix-bottom"></div>
+  <div id="matrix-bottom" class="matrix mb-3"></div>
   <canvas id="chart-bottom" height="160"></canvas>
 
-  <button id="add5-bottom" class="w-full bg-blue-500 text-white py-1 rounded mt-3">
+  <button id="add5-bottom"
+    class="w-full bg-blue-500 text-white py-1 rounded mt-2">
     ⏱ Tambah 5 Menit
   </button>
 </div>
@@ -101,7 +96,8 @@ body{
 
 <script>
 /* ================= CONFIG ================= */
-const WS_URL = "wss://red-offset-dry-treasury.trycloudflare.com";
+// ⚠️ GANTI DENGAN URL TUNNEL KAMU
+const WSS_URL = "wss://red-offset-dry-treasury.trycloudflare.com";
 
 /* ================= MATRIX ================= */
 function buildMatrix(id){
@@ -122,7 +118,7 @@ function bloom(matrix,temp,max){
     for(let x=0;x<8;x++){
       const d=Math.max(Math.abs(x-c),Math.abs(y-c));
       matrix.children[y*8+x].style.background =
-        d<=level ? "#f97316" : "#111";
+        d<=level ? "#fb923c" : "#1f2937";
     }
   }
 }
@@ -136,23 +132,36 @@ function makeChart(id,color){
   });
 }
 const chartMain=makeChart("chart-main","#ef4444");
-const chartTop=makeChart("chart-top","#ef4444");
+const chartTop=makeChart("chart-top","#f97316");
 const chartBottom=makeChart("chart-bottom","#dc2626");
 
 /* ================= WEBSOCKET ================= */
 let ws;
 
 function connectWS(){
-  ws=new WebSocket(WS_URL);
+  console.log("🔄 Connecting to", WSS_URL);
+  ws=new WebSocket(WSS_URL);
 
-  ws.onopen=()=>console.log("✅ WS connected");
+  ws.onopen=()=>console.log("✅ WebSocket CONNECTED");
 
-  ws.onclose=()=>setTimeout(connectWS,2000);
+  ws.onclose=e=>{
+    console.log("❌ WS CLOSED, retry...");
+    setTimeout(connectWS,3000);
+  };
+
+  ws.onerror=e=>{
+    console.error("🔥 WS ERROR",e);
+  };
 
   ws.onmessage=e=>{
     const d=JSON.parse(e.data);
+    console.log("📥 DATA",d);
 
-    main-temp.textContent=d.main_temp+" °C";
+    document.getElementById("status").textContent="ONLINE";
+
+    document.getElementById("main-temp").textContent =
+      d.main_temp+" °C";
+
     bloom(matrix-main,d.main_temp,200);
     bloom(matrix-top,d.top_temp,160);
     bloom(matrix-bottom,d.bottom_temp,180);
@@ -165,20 +174,25 @@ function connectWS(){
       Math.floor(d.bottom_remaining/60)+":"+
       String(d.bottom_remaining%60).padStart(2,"0");
 
-    [chartMain,chartTop,chartBottom].forEach((c,i)=>{
-      c.data.datasets[0].data.push(
-        [d.main_temp,d.top_temp,d.bottom_temp][i]
-      );
-      if(c.data.datasets[0].data.length>60)
-        c.data.datasets[0].data.shift();
-      c.update();
-    });
+    chartMain.data.datasets[0].data.push(d.main_temp);
+    chartTop.data.datasets[0].data.push(d.top_temp);
+    chartBottom.data.datasets[0].data.push(d.bottom_temp);
+
+    if(chartMain.data.datasets[0].data.length>60){
+      chartMain.data.datasets[0].data.shift();
+      chartTop.data.datasets[0].data.shift();
+      chartBottom.data.datasets[0].data.shift();
+    }
+
+    chartMain.update();
+    chartTop.update();
+    chartBottom.update();
   };
 }
 
 connectWS();
 
-/* ================= ALARM ================= */
+/* ================= CONTROL ================= */
 function toggleAlarm(zone,btn){
   const on=btn.textContent.includes("OFF");
   btn.textContent=on?"🔔 Alarm ON":"🔔 Alarm OFF";
@@ -191,14 +205,13 @@ function toggleAlarm(zone,btn){
     value:on
   }));
 }
+
 alarm-top.onclick=()=>toggleAlarm("top",alarm-top);
 alarm-bottom.onclick=()=>toggleAlarm("bottom",alarm-bottom);
 
-/* ================= TIMER +5 ================= */
 add5-top.onclick=()=>ws.send(JSON.stringify({type:"timer",zone:"top"}));
 add5-bottom.onclick=()=>ws.send(JSON.stringify({type:"timer",zone:"bottom"}));
 </script>
 
 </body>
 </html>
-

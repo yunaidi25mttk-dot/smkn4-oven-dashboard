@@ -10,208 +10,261 @@
 
 <style>
 .card{box-shadow:0 6px 18px rgba(0,0,0,.08)}
-.matrix{display:grid;grid-template-columns:repeat(8,18px);gap:4px;justify-content:center}
-.cell{width:18px;height:18px;background:#1f2937;border-radius:2px}
-body{
-  background:linear-gradient(rgba(243,244,246,.85),rgba(243,244,246,.85));
+.matrix{display:grid;grid-template-columns:repeat(8,18px);gap:4px}
+.cell{width:18px;height:18px;background:#000;border-radius:2px}
+
+/* STATUS */
+.status{
+  font-size:28px;
+  font-weight:800;
+  text-align:center;
+  padding:18px;
+  border-radius:14px;
+  transition:.4s;
 }
+
+/* BACKGROUND FOTO */
+body{
+  background:
+    linear-gradient(rgba(243,244,246,.75), rgba(243,244,246,.75)),
+    url("./iot2.jpg") center/cover no-repeat fixed !important;
+}
+
+
+.idle{background:#e5e7eb;color:#374151}
+.heating{background:linear-gradient(90deg,#dc2626,#f97316);color:white}
+.normal{background:linear-gradient(90deg,#16a34a,#22c55e);color:white}
+.warning{
+  background:linear-gradient(90deg,#dc2626,#fde047);
+  color:black;animation:pulse 1s infinite
+}
+.shutdown{
+  background:black;color:red;animation:blink .6s infinite
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.04)}}
+
+/* LOG */
+.log-box{max-height:220px;overflow:auto;font-size:13px}
+.log-item{border-bottom:1px solid #eee;padding:4px 0}
 </style>
 </head>
 
 <body>
-<div class="max-w-7xl mx-auto p-6">
+<div class="max-w-6xl mx-auto p-6">
 
-<h1 class="text-2xl font-bold mb-6">
-  Oven Dashboard – SMKN 4 Dumai
-</h1>
+<div class="flex items-center gap-3 mb-4">
+  <img src="logo-SMKN4.png" alt="Logo SMKN 4 Dumai" class="h-12">
+  <h1 class="text-2xl font-bold">
+    Oven Control Dashboard Realtime – SMKN 4 Dumai
+  </h1>
+</div>
 
-<!-- ================= MAIN ================= -->
 <div class="grid grid-cols-3 gap-4">
 
-<div class="bg-white p-4 rounded card text-center">
-  <h2 class="font-semibold mb-2">Oven Utama</h2>
-  <div id="main-temp" class="text-3xl font-bold mb-2">-- °C</div>
-  <div id="matrix-main" class="matrix"></div>
-</div>
-
+<!-- ================= CONTROL ================= -->
 <div class="bg-white p-4 rounded card">
-  <h2 class="font-semibold mb-2">Grafik Utama</h2>
-  <canvas id="chart-main" height="180"></canvas>
+  <h2 class="font-semibold mb-3">Control Panel</h2>
+
+  <button id="btn-start"
+    class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded mb-2">
+    ▶ Start Heating
+  </button>
+
+  <button id="btn-stop"
+    class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded mb-2">
+    ⛔ Stop
+  </button>
+
+  <button id="btn-reset"
+    class="w-full bg-blue-600 text-white py-2 rounded mb-4 opacity-50 cursor-not-allowed"
+    disabled>
+    🔄 Reset (after shutdown)
+  </button>
+
+  <button id="btn-export"
+    class="w-full bg-gray-700 hover:bg-gray-800 text-white py-2 rounded">
+    ⬇ Export CSV
+  </button>
+
+  <div class="mt-4 text-sm">
+    Connection:
+    <span id="conn" class="font-bold text-red-600">Disconnected</span>
+  </div>
 </div>
 
+<!-- ================= STATUS + PREVIEW ================= -->
 <div class="bg-white p-4 rounded card">
-  <h2 class="font-semibold mb-2">Status</h2>
-  <div id="status" class="text-xl font-bold">MENUNGGU DATA</div>
-</div>
+  <h2 class="font-semibold mb-2">Live Status</h2>
 
-</div>
-
-<!-- ================= BAKING MODE ================= -->
-<div class="grid grid-cols-2 gap-6 mt-8">
-
-<!-- TOP -->
-<div class="bg-white p-4 rounded card">
-  <h2 class="font-bold text-center mb-2">🔥 Api Atas (160°C)</h2>
-
-  <div class="flex justify-between text-sm mb-2">
-    <span>Timer: <b id="timer-top">--:--</b></span>
-    <button id="alarm-top"
-      class="px-3 py-1 bg-gray-600 text-white rounded text-xs">
-      🔔 Alarm OFF
-    </button>
+  <div class="flex justify-between mb-4">
+    <div>
+      <div class="text-sm text-gray-500">Temperature</div>
+      <div id="temp" class="text-3xl font-bold">-- °C</div>
+    </div>
+    <div>
+      <div class="text-sm text-gray-500">Heating</div>
+      <div id="heat" class="text-xl font-bold">--</div>
+    </div>
   </div>
 
-  <div id="matrix-top" class="matrix mb-3"></div>
-  <canvas id="chart-top" height="160"></canvas>
-
-  <button id="add5-top"
-    class="w-full bg-blue-500 text-white py-1 rounded mt-2">
-    ⏱ Tambah 5 Menit
-  </button>
+  <div class="matrix mb-4" id="matrix"></div>
+  <div id="statusBox" class="status idle">IDLE</div>
 </div>
 
-<!-- BOTTOM -->
+<!-- ================= GRAPH ================= -->
 <div class="bg-white p-4 rounded card">
-  <h2 class="font-bold text-center mb-2">🔥 Api Bawah (180°C)</h2>
+  <h2 class="font-semibold mb-2">Temperature Graph</h2>
+  <canvas id="chart" height="200"></canvas>
+</div>
 
-  <div class="flex justify-between text-sm mb-2">
-    <span>Timer: <b id="timer-bottom">--:--</b></span>
-    <button id="alarm-bottom"
-      class="px-3 py-1 bg-gray-600 text-white rounded text-xs">
-      🔔 Alarm OFF
-    </button>
+</div>
+
+<!-- ================= LOG ================= -->
+<div class="bg-white p-4 rounded card mt-6">
+  <div class="flex justify-between mb-2">
+    <h2 class="font-semibold">Event Log</h2>
+    <span class="text-xs text-gray-500">latest first</span>
   </div>
-
-  <div id="matrix-bottom" class="matrix mb-3"></div>
-  <canvas id="chart-bottom" height="160"></canvas>
-
-  <button id="add5-bottom"
-    class="w-full bg-blue-500 text-white py-1 rounded mt-2">
-    ⏱ Tambah 5 Menit
-  </button>
+  <div id="log" class="log-box"></div>
 </div>
 
-</div>
 </div>
 
 <script>
 /* ================= CONFIG ================= */
-// ⚠️ GANTI DENGAN URL TUNNEL KAMU
-const WSS_URL = "wss://red-offset-dry-treasury.trycloudflare.com";
+const WS_HOST = "192.168.0.105";
+const wsUrl = `wss://red-offset-dry-treasury.trycloudflare.com`;
+
+let ws, chart, tempData=[];
+let logData=[];
 
 /* ================= MATRIX ================= */
-function buildMatrix(id){
-  const m=document.getElementById(id);
-  for(let i=0;i<64;i++){
-    const d=document.createElement("div");
-    d.className="cell";
-    m.appendChild(d);
-  }
-}
-["matrix-main","matrix-top","matrix-bottom"].forEach(buildMatrix);
-
-/* ================= BLOOM ================= */
-function bloom(matrix,temp,max){
-  const c=3.5;
-  const level=Math.min(temp/max,1)*4;
-  for(let y=0;y<8;y++){
-    for(let x=0;x<8;x++){
-      const d=Math.max(Math.abs(x-c),Math.abs(y-c));
-      matrix.children[y*8+x].style.background =
-        d<=level ? "#fb923c" : "#1f2937";
-    }
-  }
+const matrix=document.getElementById("matrix");
+for(let i=0;i<64;i++){
+  const d=document.createElement("div");
+  d.className="cell";
+  matrix.appendChild(d);
 }
 
 /* ================= CHART ================= */
-function makeChart(id,color){
-  return new Chart(document.getElementById(id),{
-    type:"line",
-    data:{labels:[],datasets:[{data:[],borderColor:color,tension:.35}]},
-    options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false}}}
+chart=new Chart(document.getElementById("chart"),{
+  type:"line",
+  data:{labels:[],datasets:[{data:[],borderColor:"red",tension:.3}]},
+  options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false}}}
+});
+
+/* ================= STATUS ================= */
+function setStatus(mode){
+  const sb=document.getElementById("statusBox");
+  sb.className="status";
+
+  if(mode==="IDLE"){sb.textContent="IDLE";sb.classList.add("idle")}
+  else if(mode==="HEATING"){sb.textContent="HEATING";sb.classList.add("heating")}
+  else if(mode==="NORMAL"){sb.textContent="NORMAL HEATING";sb.classList.add("normal")}
+  else if(mode==="WARNING"){sb.textContent="OVERHEAT WARNING";sb.classList.add("warning")}
+  else if(mode==="SHUTDOWN"){sb.textContent="AUTO SHUTDOWN";sb.classList.add("shutdown")}
+}
+
+/* ================= BLOOM PREVIEW ================= */
+function bloom(c1,c2){
+  const cx=3.5,cy=3.5;
+  [0.6,1.4,2.2,3,3.6].forEach((r,i)=>{
+    setTimeout(()=>{
+      for(let y=0;y<8;y++){
+        for(let x=0;x<8;x++){
+          const d=Math.max(Math.abs(x-cx),Math.abs(y-cy));
+          matrix.children[y*8+x].style.background =
+            d<=r ? (d<1?c1:c2) : "#000";
+        }
+      }
+    },i*90);
   });
 }
-const chartMain=makeChart("chart-main","#ef4444");
-const chartTop=makeChart("chart-top","#f97316");
-const chartBottom=makeChart("chart-bottom","#dc2626");
 
-/* ================= WEBSOCKET ================= */
-let ws;
+function preview(mode){
+  if(mode==="HEATING") bloom("#dc2626","#f97316");
+  else if(mode==="NORMAL") bloom("#16a34a","#22c55e");
+  else if(mode==="WARNING") bloom("#dc2626","#fde047");
+  else if(mode==="SHUTDOWN"){
+    matrix.childNodes.forEach(c=>c.style.background="#dc2626");
+  } else {
+    matrix.childNodes.forEach(c=>c.style.background="#9ca3af");
+  }
+}
 
-function connectWS(){
-  console.log("🔄 Connecting to", WSS_URL);
-  ws=new WebSocket(WSS_URL);
+/* ================= RESET BUTTON ================= */
+const btnReset=document.getElementById("btn-reset");
+function updateReset(mode){
+  if(mode==="SHUTDOWN"){
+    btnReset.disabled=false;
+    btnReset.classList.remove("opacity-50","cursor-not-allowed");
+  } else {
+    btnReset.disabled=true;
+    btnReset.classList.add("opacity-50","cursor-not-allowed");
+  }
+}
 
-  ws.onopen=()=>console.log("✅ WebSocket CONNECTED");
+/* ================= LOG ================= */
+function addLog(t,temp,mode){
+  logData.unshift({t,temp,mode});
+  const div=document.createElement("div");
+  div.className="log-item";
+  div.textContent=`[${t}] ${temp}°C | ${mode}`;
+  document.getElementById("log").prepend(div);
+}
 
-  ws.onclose=e=>{
-    console.log("❌ WS CLOSED, retry...");
-    setTimeout(connectWS,3000);
-  };
+/* ================= CSV ================= */
+document.getElementById("btn-export").onclick=()=>{
+  let csv="Time,Temperature,Mode\n";
+  logData.forEach(r=>csv+=`${r.t},${r.temp},${r.mode}\n`);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="oven_log.csv";
+  a.click();
+};
 
-  ws.onerror=e=>{
-    console.error("🔥 WS ERROR",e);
-  };
+/* ================= WS ================= */
+function connect(){
+  ws=new WebSocket(wsUrl);
+
+  ws.onopen=()=>document.getElementById("conn").textContent="Connected";
+  ws.onclose=()=>setTimeout(connect,2000);
 
   ws.onmessage=e=>{
     const d=JSON.parse(e.data);
-    console.log("📥 DATA",d);
+    const time=new Date().toLocaleTimeString();
 
-    document.getElementById("status").textContent="ONLINE";
+    document.getElementById("temp").textContent=d.temperature+" °C";
+    document.getElementById("heat").textContent=d.heating_active?"ON":"OFF";
 
-    document.getElementById("main-temp").textContent =
-      d.main_temp+" °C";
-
-    bloom(matrix-main,d.main_temp,200);
-    bloom(matrix-top,d.top_temp,160);
-    bloom(matrix-bottom,d.bottom_temp,180);
-
-    timer-top.textContent=
-      Math.floor(d.top_remaining/60)+":"+
-      String(d.top_remaining%60).padStart(2,"0");
-
-    timer-bottom.textContent=
-      Math.floor(d.bottom_remaining/60)+":"+
-      String(d.bottom_remaining%60).padStart(2,"0");
-
-    chartMain.data.datasets[0].data.push(d.main_temp);
-    chartTop.data.datasets[0].data.push(d.top_temp);
-    chartBottom.data.datasets[0].data.push(d.bottom_temp);
-
-    if(chartMain.data.datasets[0].data.length>60){
-      chartMain.data.datasets[0].data.shift();
-      chartTop.data.datasets[0].data.shift();
-      chartBottom.data.datasets[0].data.shift();
+    if(d.mode){
+      setStatus(d.mode);
+      preview(d.mode);
+      updateReset(d.mode);
+      addLog(time,d.temperature,d.mode);
     }
 
-    chartMain.update();
-    chartTop.update();
-    chartBottom.update();
+    tempData.push(d.temperature);
+    if(tempData.length>60)tempData.shift();
+    chart.data.labels=tempData.map((_,i)=>i);
+    chart.data.datasets[0].data=tempData;
+    chart.update();
   };
 }
 
-connectWS();
+/* ================= BUTTONS ================= */
+document.getElementById("btn-start").onclick=()=>{
+  ws.send(JSON.stringify({type:"control",action:"start_heating"}));
+};
+document.getElementById("btn-stop").onclick=()=>{
+  ws.send(JSON.stringify({type:"control",action:"stop_heating"}));
+};
+btnReset.onclick=()=>{
+  ws.send(JSON.stringify({type:"control",action:"reset"}));
+};
 
-/* ================= CONTROL ================= */
-function toggleAlarm(zone,btn){
-  const on=btn.textContent.includes("OFF");
-  btn.textContent=on?"🔔 Alarm ON":"🔔 Alarm OFF";
-  btn.classList.toggle("bg-red-600",on);
-  btn.classList.toggle("bg-gray-600",!on);
-
-  ws.send(JSON.stringify({
-    type:"alarm",
-    zone:zone,
-    value:on
-  }));
-}
-
-alarm-top.onclick=()=>toggleAlarm("top",alarm-top);
-alarm-bottom.onclick=()=>toggleAlarm("bottom",alarm-bottom);
-
-add5-top.onclick=()=>ws.send(JSON.stringify({type:"timer",zone:"top"}));
-add5-bottom.onclick=()=>ws.send(JSON.stringify({type:"timer",zone:"bottom"}));
+connect();
 </script>
-
 </body>
 </html>
